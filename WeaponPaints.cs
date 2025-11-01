@@ -117,17 +117,6 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 
 	public override void OnAllPluginsLoaded(bool hotReload)
 	{
-		try
-		{
-			MenuApi = MenuCapability.Get();
-		
-			RegisterCommands();
-		}
-		catch (Exception)
-		{
-			MenuApi = null;
-			Logger.LogError("Error while loading required plugins");
-			throw;
-		}
+		RegisterCommands();
 	}
 }
