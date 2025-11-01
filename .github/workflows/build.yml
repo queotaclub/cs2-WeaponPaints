@@ -32,14 +32,8 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 8.0.x
-    - name: Install jq (for patch config)
-      run: sudo apt-get update && sudo apt-get install -y jq
     - name: Restore
       run: dotnet restore
-    - name: Patch files for build
-      run: |
-        chmod +x scripts/patch-build.sh
-        TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} bash scripts/patch-build.sh
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
 
@@ -54,14 +48,8 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 8.0.x
-    - name: Install jq (for patch config)
-      run: sudo apt-get update && sudo apt-get install -y jq
     - name: Restore
       run: dotnet restore
-    - name: Patch files for build
-      run: |
-        chmod +x scripts/patch-build.sh
-        TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} bash scripts/patch-build.sh
     - name: Build
       run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
     - name: Clean files
