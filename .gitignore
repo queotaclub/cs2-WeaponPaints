@@ -4,3 +4,6 @@ obj/
 website/getskins.php
 .idea/
 WeaponPaints.sln.DotSettings.user
+
+# Ignore website directory (fork-specific, cleaned on upstream sync)
+website/

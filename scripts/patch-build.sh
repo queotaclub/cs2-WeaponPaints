@@ -85,7 +85,7 @@ if [ "$TARGET_PLATFORM" = "linux" ]; then
     echo -e "${GREEN}Patching for Linux build...${NC}"
     
     # Remove Windows-specific files
-    remove_file "Patches/MemoryWindows.cs"
+    # remove_file "Patches/MemoryWindows.cs"
     
     # Comment out Windows-specific code in Patch.cs if needed
     # This is handled by runtime checks, but you can add specific patches here
@@ -94,7 +94,7 @@ elif [ "$TARGET_PLATFORM" = "windows" ]; then
     echo -e "${GREEN}Patching for Windows build...${NC}"
     
     # Remove Linux-specific files
-    remove_file "Patches/MemoryLinux.cs"
+    # remove_file "Patches/MemoryLinux.cs"
     
     # Comment out Linux-specific code if needed
 fi

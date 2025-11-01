@@ -1,16 +1,114 @@
 {
   "platforms": {
     "linux": {
-      "remove_files": [
-        "Patches/MemoryWindows.cs"
-      ],
-      "replacements": []
+      "remove_files": [],
+      "replacements": [
+        {
+          "file": "Utility.cs",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/en.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/ru.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pl.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pt-BR.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pt-PT.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/tr.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/ua.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/zh-cn.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/lv.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        }
+      ]
     },
     "windows": {
-      "remove_files": [
-        "Patches/MemoryLinux.cs"
-      ],
-      "replacements": []
+      "remove_files": [],
+      "replacements": [
+        {
+          "file": "Utility.cs",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/en.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/ru.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pl.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pt-BR.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/pt-PT.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/tr.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/ua.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/zh-cn.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        },
+        {
+          "file": "lang/lv.json",
+          "search": "[WeaponPaints]",
+          "replace": "[queota.club]"
+        }
+      ]
     }
   },
   "common": {

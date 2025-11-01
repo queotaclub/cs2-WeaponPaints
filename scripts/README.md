@@ -6,6 +6,7 @@ This directory contains scripts for patching files before building the project, 
 
 - **`patch-build.sh`** - Main patching script that removes platform-specific files
 - **`patch-config.json`** - Configuration file for custom patching rules
+- **`sync-upstream.sh`** - Helper script to sync from upstream and trigger cleanup
 
 ## Usage
 
@@ -107,10 +108,48 @@ Or restore all files:
 git restore .
 ```
 
+## Git Hook: Automatic Website Cleanup
+
+A **post-merge git hook** is configured (`.git/hooks/post-merge`) that automatically:
+- Detects when you sync/merge from upstream (github/main)
+- Deletes the `website/` directory
+- Ensures `website/` is in `.gitignore`
+
+### Using the Sync Helper Script
+
+Use the helper script for easy upstream syncing:
+
+```bash
+# Sync main branch from upstream
+./scripts/sync-upstream.sh main
+
+# Or specify a different branch
+./scripts/sync-upstream.sh dev
+```
+
+The script will:
+1. Fetch from the `github` remote
+2. Merge the specified branch
+3. Trigger the post-merge hook automatically
+4. Clean up the website directory
+
+### Manual Syncing
+
+If you manually sync using git commands:
+
+```bash
+git fetch github
+git merge github/main
+# The post-merge hook will run automatically
+```
+
+The hook detects merges from `github/main` and performs the cleanup automatically.
+
 ## Notes
 
 - Files removed by the script are permanently deleted from the workspace during the build process
 - The script is designed to run in CI/CD pipelines where a fresh checkout happens each time
 - For local development, you may want to restore files after testing builds
 - The script uses colored output for better visibility (green for success, yellow for warnings)
+- The git hook runs automatically after merge operations - no manual action needed
 
