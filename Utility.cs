@@ -190,33 +190,6 @@ namespace WeaponPaints
 			Console.WriteLine("[WeaponPaints] " + message);
 			Console.ResetColor();
 		}
-		
-		internal static IMenu? CreateMenu(string title)
-		{
-			var menuType = WeaponPaints.Instance.Config.MenuType.ToLower();
-        
-			var menu = menuType switch
-			{
-				_ when menuType.Equals("selectable", StringComparison.CurrentCultureIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenu(title),
-
-				_ when menuType.Equals("dynamic", StringComparison.CurrentCultureIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ButtonMenu),
-
-				_ when menuType.Equals("center", StringComparison.CurrentCultureIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.CenterMenu),
-
-				_ when menuType.Equals("chat", StringComparison.CurrentCultureIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ChatMenu),
-
-				_ when menuType.Equals("console", StringComparison.CurrentCultureIgnoreCase) =>
-					WeaponPaints.MenuApi?.NewMenuForcetype(title, MenuType.ConsoleMenu),
-
-				_ => WeaponPaints.MenuApi?.NewMenu(title)
-			};
-
-			return menu;
-		}
 
 		internal static async Task CheckVersion(string version, ILogger logger)
 		{
@@ -224,7 +197,7 @@ namespace WeaponPaints
 
 			try
 			{
-				var response = await client.GetAsync("https://raw.githubusercontent.com/Nereziel/cs2-WeaponPaints/main/VERSION").ConfigureAwait(false);
+				var response = await client.GetAsync("https://raw.githubusercontent.com/queotaclub/cs2-WeaponPaints/main/VERSION").ConfigureAwait(false);
 
 				if (response.IsSuccessStatusCode)
 				{
@@ -236,7 +209,7 @@ namespace WeaponPaints
 					switch (comparisonResult)
 					{
 						case < 0:
-							logger.LogWarning("Plugin is outdated! Check https://github.com/Nereziel/cs2-WeaponPaints");
+							logger.LogWarning("Plugin is outdated! Check https://github.com/queotaclub/cs2-WeaponPaints");
 							break;
 						case > 0:
 							logger.LogInformation("Probably dev version detected");
@@ -272,7 +245,7 @@ namespace WeaponPaints
 			Console.WriteLine("|   _   ||   |___ |   _   ||   |    |       || | |   ||   |    |   _   ||   | | | |   |  |   |   _____| |");
 			Console.WriteLine("|__| |__||_______||__| |__||___|    |_______||_|  |__||___|    |__| |__||___| |_|  |__|  |___|  |_______|");
 			Console.WriteLine("						>> Version: " + moduleVersion);
-			Console.WriteLine("			>> GitHub: https://github.com/Nereziel/cs2-WeaponPaints");
+			Console.WriteLine("			>> GitHub: https://github.com/queotaclub/cs2-WeaponPaints");
 			Console.WriteLine(" ");
 		}
 	}
