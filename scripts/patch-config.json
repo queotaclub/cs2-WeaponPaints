@@ -1,0 +1,21 @@
+{
+  "platforms": {
+    "linux": {
+      "remove_files": [
+        "Patches/MemoryWindows.cs"
+      ],
+      "replacements": []
+    },
+    "windows": {
+      "remove_files": [
+        "Patches/MemoryLinux.cs"
+      ],
+      "replacements": []
+    }
+  },
+  "common": {
+    "remove_files": [],
+    "replacements": []
+  }
+}
+
