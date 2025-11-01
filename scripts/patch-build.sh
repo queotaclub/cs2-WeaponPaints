@@ -115,23 +115,42 @@ comment_code_pattern() {
     }
 }
 
-# Function to replace multiline patterns (more robust)
-replace_multiline_pattern() {
+# Function to wrap code blocks in #if directives (simple sed-based approach)
+wrap_with_ifdef() {
     local file_path="$1"
-    local search_pattern="$2"
-    local replace_text="$3"
+    local start_pattern="$2"
+    local end_pattern="${3:-}"
+    local define_name="${4:-NO_MENUS}"
     
     if [ ! -f "$PROJECT_ROOT/$file_path" ]; then
         echo -e "${YELLOW}File not found (skipping): $file_path${NC}"
         return
     fi
     
-    echo -e "${YELLOW}Replacing multiline pattern in: $file_path${NC}"
+    # Skip if already wrapped
+    if grep -q "#if !${define_name}" "$PROJECT_ROOT/$file_path" 2>/dev/null; then
+        echo -e "${YELLOW}Already wrapped, skipping: $file_path${NC}"
+        return
+    fi
     
-    # Use perl for multiline replacements (handles whitespace variations better)
-    perl -i -0777 -pe "s|$search_pattern|$replace_text|gs" "$PROJECT_ROOT/$file_path" 2>/dev/null || {
-        echo -e "${YELLOW}Warning: Multiline replacement failed${NC}"
-    }
+    echo -e "${YELLOW}Wrapping menu code with #if !${define_name} in: $file_path${NC}"
+    
+    # Simple approach: insert #if before start pattern line
+    # Escape pattern for sed
+    local escaped_start=$(echo "$start_pattern" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    
+    # Insert #if !NO_MENUS before the line matching the pattern
+    sed -i "/${escaped_start}/i\\
+#if !${define_name}\\
+" "$PROJECT_ROOT/$file_path"
+    
+    # Insert #endif after end pattern (if specified)
+    if [ -n "$end_pattern" ] && [ "$end_pattern" != "^}" ]; then
+        local escaped_end=$(echo "$end_pattern" | sed 's/[[\.*^$()+?{|]/\\&/g')
+        sed -i "/${escaped_end}/a\\
+#endif // !${define_name}\\
+" "$PROJECT_ROOT/$file_path"
+    fi
 }
 
 # Platform-specific patching
@@ -177,10 +196,16 @@ if [ -f "$CONFIG_FILE" ]; then
                 use_regex=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].regex // false" "$CONFIG_FILE" 2>/dev/null)
                 multiline=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].multiline // false" "$CONFIG_FILE" 2>/dev/null)
                 
-                if [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$search" ] && [ "$search" != "null" ]; then
-                    if [ "$multiline" = "true" ]; then
+                wrap_ifdef=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].wrap_ifdef // false" "$CONFIG_FILE" 2>/dev/null)
+                start_line=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].start_line" "$CONFIG_FILE" 2>/dev/null)
+                end_line=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].end_line" "$CONFIG_FILE" 2>/dev/null)
+                
+                if [ -n "$file" ] && [ "$file" != "null" ]; then
+                    if [ "$wrap_ifdef" = "true" ] && [ -n "$start_line" ] && [ "$start_line" != "null" ]; then
+                        wrap_with_ifdef "$file" "$start_line" "${end_line:-"^}"}" "NO_MENUS"
+                    elif [ "$multiline" = "true" ]; then
                         replace_multiline_pattern "$file" "$search" "$replace"
-                    else
+                    elif [ -n "$search" ] && [ "$search" != "null" ]; then
                         replace_text "$file" "$search" "$replace" "$use_regex"
                     fi
                 fi
