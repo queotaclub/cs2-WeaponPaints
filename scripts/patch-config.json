@@ -52,6 +52,27 @@
           "file": "lang/lv.json",
           "search": "[WeaponPaints]",
           "replace": "[queota.club]"
+        },
+        {
+          "file": "WeaponPaints.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "MenuApi\\s*=\\s*MenuCapability\\.Get\\(\\);\\s*\\n\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.KnifeEnabled\\)\\s*\\n\\s*SetupKnifeMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.SkinEnabled\\)\\s*\\n\\s*SetupSkinsMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.GloveEnabled\\)\\s*\\n\\s*SetupGlovesMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.AgentEnabled\\)\\s*\\n\\s*SetupAgentsMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.MusicEnabled\\)\\s*\\n\\s*SetupMusicMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.PinsEnabled\\)\\s*\\n\\s*SetupPinsMenu\\(\\);",
+          "replace": "// MenuApi = MenuCapability.Get(); // Disabled: No menus needed, using chat commands only\n\t\t\t//\n\t\t\t// if (Config.Additional.KnifeEnabled)\n\t\t\t// \tSetupKnifeMenu();\n\t\t\t// if (Config.Additional.SkinEnabled)\n\t\t\t// \tSetupSkinsMenu();\n\t\t\t// if (Config.Additional.GloveEnabled)\n\t\t\t// \tSetupGlovesMenu();\n\t\t\t// if (Config.Additional.AgentEnabled)\n\t\t\t// \tSetupAgentsMenu();\n\t\t\t// if (Config.Additional.MusicEnabled)\n\t\t\t// \tSetupMusicMenu();\n\t\t\t// if (Config.Additional.PinsEnabled)\n\t\t\t// \tSetupPinsMenu();"
+        },
+        {
+          "file": "Utility.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "internal static IMenu\\? CreateMenu\\(string title\\)\\s*\\{[^}]*?var menuType[^}]*?return menu;\\s*\\}",
+          "replace": "// Disabled: No menus needed, using chat commands only\n\t\tinternal static IMenu? CreateMenu(string title)\n\t\t{\n\t\t\treturn null; // Menu functionality disabled\n\t\t}"
+        },
+        {
+          "file": "Variables.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "internal static IMenuApi\\? MenuApi;\\s*\\n\\s*private static readonly PluginCapability<IMenuApi> MenuCapability\\s*=\\s*new\\(\"menu:nfcore\"\\);",
+          "replace": "// Disabled: No menus needed, using chat commands only\n\t\t// internal static IMenuApi? MenuApi;\n\t\t// private static readonly PluginCapability<IMenuApi> MenuCapability = new(\"menu:nfcore\");"
         }
       ]
     },
@@ -107,6 +128,27 @@
           "file": "lang/lv.json",
           "search": "[WeaponPaints]",
           "replace": "[queota.club]"
+        },
+        {
+          "file": "WeaponPaints.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "MenuApi\\s*=\\s*MenuCapability\\.Get\\(\\);\\s*\\n\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.KnifeEnabled\\)\\s*\\n\\s*SetupKnifeMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.SkinEnabled\\)\\s*\\n\\s*SetupSkinsMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.GloveEnabled\\)\\s*\\n\\s*SetupGlovesMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.AgentEnabled\\)\\s*\\n\\s*SetupAgentsMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.MusicEnabled\\)\\s*\\n\\s*SetupMusicMenu\\(\\);\\s*\\n\\s*if\\s*\\(Config\\.Additional\\.PinsEnabled\\)\\s*\\n\\s*SetupPinsMenu\\(\\);",
+          "replace": "// MenuApi = MenuCapability.Get(); // Disabled: No menus needed, using chat commands only\n\t\t\t//\n\t\t\t// if (Config.Additional.KnifeEnabled)\n\t\t\t// \tSetupKnifeMenu();\n\t\t\t// if (Config.Additional.SkinEnabled)\n\t\t\t// \tSetupSkinsMenu();\n\t\t\t// if (Config.Additional.GloveEnabled)\n\t\t\t// \tSetupGlovesMenu();\n\t\t\t// if (Config.Additional.AgentEnabled)\n\t\t\t// \tSetupAgentsMenu();\n\t\t\t// if (Config.Additional.MusicEnabled)\n\t\t\t// \tSetupMusicMenu();\n\t\t\t// if (Config.Additional.PinsEnabled)\n\t\t\t// \tSetupPinsMenu();"
+        },
+        {
+          "file": "Utility.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "internal static IMenu\\? CreateMenu\\(string title\\)\\s*\\{[^}]*?var menuType[^}]*?return menu;\\s*\\}",
+          "replace": "// Disabled: No menus needed, using chat commands only\n\t\tinternal static IMenu? CreateMenu(string title)\n\t\t{\n\t\t\treturn null; // Menu functionality disabled\n\t\t}"
+        },
+        {
+          "file": "Variables.cs",
+          "multiline": true,
+          "regex": true,
+          "search": "internal static IMenuApi\\? MenuApi;\\s*\\n\\s*private static readonly PluginCapability<IMenuApi> MenuCapability\\s*=\\s*new\\(\"menu:nfcore\"\\);",
+          "replace": "// Disabled: No menus needed, using chat commands only\n\t\t// internal static IMenuApi? MenuApi;\n\t\t// private static readonly PluginCapability<IMenuApi> MenuCapability = new(\"menu:nfcore\");"
         }
       ]
     }
@@ -116,4 +158,3 @@
     "replacements": []
   }
 }
-

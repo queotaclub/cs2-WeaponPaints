@@ -65,11 +65,12 @@ comment_code_block() {
     fi
 }
 
-# Function to replace text in file
+# Function to replace text in file (with flexible whitespace matching)
 replace_text() {
     local file_path="$1"
     local search_text="$2"
     local replace_text="$3"
+    local use_regex="${4:-false}"
     
     if [ ! -f "$PROJECT_ROOT/$file_path" ]; then
         echo -e "${YELLOW}File not found (skipping): $file_path${NC}"
@@ -77,7 +78,60 @@ replace_text() {
     fi
     
     echo -e "${YELLOW}Replacing text in: $file_path${NC}"
-    sed -i "s|$search_text|$replace_text|g" "$PROJECT_ROOT/$file_path"
+    
+    if [ "$use_regex" = "true" ]; then
+        # Use perl for regex replacements (more robust)
+        perl -i -pe "s|$search_text|$replace_text|gs" "$PROJECT_ROOT/$file_path" 2>/dev/null || {
+            echo -e "${YELLOW}Warning: Regex replacement failed, trying sed...${NC}"
+            sed -i "s|$search_text|$replace_text|g" "$PROJECT_ROOT/$file_path"
+        }
+    else
+        # Normal sed replacement
+        sed -i "s|$search_text|$replace_text|g" "$PROJECT_ROOT/$file_path"
+    fi
+}
+
+# Function to comment out code block using pattern matching
+comment_code_pattern() {
+    local file_path="$1"
+    local start_pattern="$2"
+    local end_pattern="$3"
+    local comment_prefix="${4:-//}"
+    
+    if [ ! -f "$PROJECT_ROOT/$file_path" ]; then
+        echo -e "${YELLOW}File not found (skipping): $file_path${NC}"
+        return
+    fi
+    
+    echo -e "${YELLOW}Commenting code pattern in: $file_path${NC}"
+    
+    # Use perl for more robust multiline pattern matching
+    perl -i -pe "
+        if (/$start_pattern/ .. /$end_pattern/) {
+            \$_ = \"$comment_prefix \$_\" unless /^\\s*$comment_prefix/
+        }
+    " "$PROJECT_ROOT/$file_path" 2>/dev/null || {
+        echo -e "${YELLOW}Warning: Pattern commenting failed${NC}"
+    }
+}
+
+# Function to replace multiline patterns (more robust)
+replace_multiline_pattern() {
+    local file_path="$1"
+    local search_pattern="$2"
+    local replace_text="$3"
+    
+    if [ ! -f "$PROJECT_ROOT/$file_path" ]; then
+        echo -e "${YELLOW}File not found (skipping): $file_path${NC}"
+        return
+    fi
+    
+    echo -e "${YELLOW}Replacing multiline pattern in: $file_path${NC}"
+    
+    # Use perl for multiline replacements (handles whitespace variations better)
+    perl -i -0777 -pe "s|$search_pattern|$replace_text|gs" "$PROJECT_ROOT/$file_path" 2>/dev/null || {
+        echo -e "${YELLOW}Warning: Multiline replacement failed${NC}"
+    }
 }
 
 # Platform-specific patching
@@ -120,7 +174,16 @@ if [ -f "$CONFIG_FILE" ]; then
                 file=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].file" "$CONFIG_FILE" 2>/dev/null)
                 search=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].search" "$CONFIG_FILE" 2>/dev/null)
                 replace=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].replace" "$CONFIG_FILE" 2>/dev/null)
-                [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$search" ] && [ "$search" != "null" ] && replace_text "$file" "$search" "$replace"
+                use_regex=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].regex // false" "$CONFIG_FILE" 2>/dev/null)
+                multiline=$(jq -r ".platforms.${TARGET_PLATFORM}.replacements[$i].multiline // false" "$CONFIG_FILE" 2>/dev/null)
+                
+                if [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$search" ] && [ "$search" != "null" ]; then
+                    if [ "$multiline" = "true" ]; then
+                        replace_multiline_pattern "$file" "$search" "$replace"
+                    else
+                        replace_text "$file" "$search" "$replace" "$use_regex"
+                    fi
+                fi
             done
         fi
     else
