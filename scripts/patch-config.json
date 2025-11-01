@@ -52,60 +52,6 @@
           "file": "lang/lv.json",
           "search": "[WeaponPaints]",
           "replace": "[queota.club]"
-        },
-        {
-          "file": "WeaponPaints.cs",
-          "wrap_ifdef": true,
-          "start_line": "MenuApi = MenuCapability.Get\\(\\);",
-          "end_line": "SetupPinsMenu\\(\\);"
-        },
-        {
-          "file": "Utility.cs",
-          "wrap_ifdef": true,
-          "start_line": "internal static IMenu\\? CreateMenu\\(string title\\)",
-          "end_line": "return menu;"
-        },
-        {
-          "file": "Variables.cs",
-          "wrap_ifdef": true,
-          "start_line": "internal static IMenuApi\\? MenuApi;",
-          "end_line": "MenuCapability = new"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupKnifeMenu\\(\\)",
-          "end_line": "^}"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupSkinsMenu\\(\\)",
-          "end_line": "^}"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupGlovesMenu\\(\\)",
-          "end_line": "^}"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupAgentsMenu\\(\\)",
-          "end_line": "^}"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupMusicMenu\\(\\)",
-          "end_line": "^}"
-        },
-        {
-          "file": "Commands.cs",
-          "wrap_ifdef": true,
-          "start_line": "private void SetupPinsMenu\\(\\)",
-          "end_line": "^}"
         }
       ]
     },
@@ -161,25 +107,6 @@
           "file": "lang/lv.json",
           "search": "[WeaponPaints]",
           "replace": "[queota.club]"
-        },
-        {
-          "file": "WeaponPaints.cs",
-          "wrap_ifdef": true,
-          "start_line": "MenuApi = MenuCapability.Get\\(\\);",
-          "end_line": "SetupPinsMenu\\(\\);"
-        },
-        {
-          "file": "Utility.cs",
-          "wrap_ifdef": true,
-          "start_line": "internal static IMenu\\? CreateMenu",
-          "end_line": "return menu;"
-        },
-        {
-          "file": "Variables.cs",
-          "wrap_ifdef": true,
-          "start_line": "internal static IMenuApi\\? MenuApi;",
-          "start_line": "internal static IMenuApi\\? MenuApi;",
-          "end_line": "MenuCapability = new"
         }
       ]
     }
