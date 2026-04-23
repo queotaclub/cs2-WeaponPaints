@@ -47,7 +47,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 				         .OfType<CCSPlayerController>(Utilities.GetPlayers().TakeWhile(_ => WeaponSync != null))
 				         .Where(player => player.IsValid &&
 					         !string.IsNullOrEmpty(player.IpAddress) && player is
-						         { IsBot: false, Connected: PlayerConnectedState.PlayerConnected }))
+						         { IsBot: false, Connected: PlayerConnectedState.Connected }))
 			{
 				var playerInfo = new PlayerInfo
 				{
