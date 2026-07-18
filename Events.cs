@@ -18,7 +18,7 @@ namespace WeaponPaints
 			CCSPlayerController? player = @event.Userid;
 
 			if (player is null || !player.IsValid || player.IsBot ||
-				WeaponSync == null || Database == null) return HookResult.Continue;
+				WeaponSync == null) return HookResult.Continue;
 
 			var playerInfo = new PlayerInfo
 			{
@@ -82,11 +82,9 @@ namespace WeaponPaints
 				IpAddress = player.IpAddress?.Split(":")[0]
 			};
 
-			Task.Run(async () => 
+			Task.Run(() =>
 			{
-				if (WeaponSync != null)
-					await WeaponSync.SyncStatTrakToDatabase(playerInfo);
-
+				// ponytail: no StatTrak writeback — Rails/website owns loadout
 				if (Config.Additional.SkinEnabled)
 				{
 					GPlayerWeaponsInfo.TryRemove(player.Slot, out _);
@@ -125,8 +123,7 @@ namespace WeaponPaints
 		{
 			if (Config.Additional is { KnifeEnabled: false, SkinEnabled: false, GloveEnabled: false }) return;
 			
-			if (Database != null)
-				WeaponSync = new WeaponSynchronization(Database, Config);
+			WeaponSync = new WeaponSynchronization(Config);
 
 			_fadeSeed = 0;
 			_nextItemId = MinimumCustomItemId;

@@ -71,11 +71,18 @@ namespace WeaponPaints
 
 	public class WeaponPaintsConfig : BasePluginConfig
 	{
-        [JsonPropertyName("ConfigVersion")] public override int Version { get; set; } = 10;
+        [JsonPropertyName("ConfigVersion")] public override int Version { get; set; } = 11;
 
         [JsonPropertyName("SkinsLanguage")]
 		public string SkinsLanguage { get; set; } = "en";
 
+		[JsonPropertyName("ApiUrl")]
+		public string ApiUrl { get; set; } = "https://api.queota.club";
+
+		[JsonPropertyName("ApiKey")]
+		public string ApiKey { get; set; } = "";
+
+		// Legacy MySQL fields kept for config file compat; unused when ApiUrl is set
 		[JsonPropertyName("DatabaseHost")]
 		public string DatabaseHost { get; set; } = "";
 
@@ -95,7 +102,7 @@ namespace WeaponPaints
 		public int CmdRefreshCooldownSeconds { get; set; } = 3;
 
 		[JsonPropertyName("Website")]
-		public string Website { get; set; } = "example.com/skins";
+		public string Website { get; set; } = "queota.club/loadout";
 
 		[JsonPropertyName("Additional")]
 		public Additional Additional { get; set; } = new();

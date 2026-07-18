@@ -1,12 +1,7 @@
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
-using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Entities.Constants;
 using Microsoft.Extensions.Logging;
-using MySqlConnector;
 
 namespace WeaponPaints;
 
@@ -16,26 +11,20 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 	internal static WeaponPaints Instance { get; private set; } = new();
 
 	public WeaponPaintsConfig Config { get; set; } = new();
-    private static WeaponPaintsConfig _config { get; set; } = new();
-    public override string ModuleAuthor => "Nereziel & daffyy";
+	private static WeaponPaintsConfig _config { get; set; } = new();
+	public override string ModuleAuthor => "Nereziel & daffyy";
 	public override string ModuleDescription => "Skin, gloves, agents and knife selector, standalone and web-based";
 	public override string ModuleName => "WeaponPaints";
-	public override string ModuleVersion => "3.3a";
+	public override string ModuleVersion => "3.4-queota";
 
 	public override void Load(bool hotReload)
 	{
-		// Hardcoded hotfix needs to be changed later (Not needed 17.09.2025)
-		//if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-		//	Patch.PerformPatch("0F 85 ? ? ? ? 31 C0 B9 ? ? ? ? BA ? ? ? ? 66 0F EF C0 31 F6 31 FF 48 C7 45 ? ? ? ? ? 48 C7 45 ? ? ? ? ? 48 C7 45 ? ? ? ? ? 48 C7 45 ? ? ? ? ? 0F 29 45 ? 48 C7 45 ? ? ? ? ? C7 45 ? ? ? ? ? 66 89 45 ? E8 ? ? ? ? 41 89 C5 85 C0 0F 8E", "90 90 90 90 90 90");
-		//else
-		//	Patch.PerformPatch("74 ? 48 8D 0D ? ? ? ? FF 15 ? ? ? ? EB ? BA", "EB");
-		
 		Instance = this;
 
 		if (hotReload)
 		{
 			OnMapStart(string.Empty);
-			
+
 			GPlayerWeaponsInfo.Clear();
 			GPlayersKnife.Clear();
 			GPlayersGlove.Clear();
@@ -47,7 +36,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 				         .OfType<CCSPlayerController>(Utilities.GetPlayers().TakeWhile(_ => WeaponSync != null))
 				         .Where(player => player.IsValid &&
 					         !string.IsNullOrEmpty(player.IpAddress) && player is
-						         { IsBot: false, Connected: PlayerConnectedState.Connected }))
+					         { IsBot: false, Connected: PlayerConnectedState.Connected }))
 			{
 				var playerInfo = new PlayerInfo
 				{
@@ -80,9 +69,9 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 		Config = config;
 		_config = config;
 
-		if (config.DatabaseHost.Length < 1 || config.DatabaseName.Length < 1 || config.DatabaseUser.Length < 1)
+		if (string.IsNullOrWhiteSpace(config.ApiUrl) || string.IsNullOrWhiteSpace(config.ApiKey))
 		{
-			Logger.LogError("You need to setup Database credentials in \"configs/plugins/WeaponPaints/WeaponPaints.json\"!");
+			Logger.LogError("You need to setup ApiUrl and ApiKey in \"configs/plugins/WeaponPaints/WeaponPaints.json\"!");
 			Unload(false);
 			return;
 		}
@@ -93,21 +82,10 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 			Unload(false);
 			return;
 		}
-		
-		var builder = new MySqlConnectionStringBuilder
-		{
-			Server = config.DatabaseHost,
-			UserID = config.DatabaseUser,
-			Password = config.DatabasePassword,
-			Database = config.DatabaseName,
-			Port = (uint)config.DatabasePort,
-			Pooling = true,
-			MaximumPoolSize = 640,
-		};
 
-		Database = new Database(builder.ConnectionString);
+		Database = null;
+		WeaponSync = new WeaponSynchronization(config);
 
-		_ = Utility.CheckDatabaseTables();
 		_localizer = Localizer;
 
 		Utility.Config = config;
