@@ -82,9 +82,12 @@ namespace WeaponPaints
 				IpAddress = player.IpAddress?.Split(":")[0]
 			};
 
-			Task.Run(() =>
+			Task.Run(async () =>
 			{
-				// ponytail: no StatTrak writeback — Rails/website owns loadout
+				// Flush StatTrak counts before clearing in-memory loadout.
+				if (WeaponSync != null)
+					await WeaponSync.SyncStatTrakToDatabase(playerInfo, force: true);
+
 				if (Config.Additional.SkinEnabled)
 				{
 					GPlayerWeaponsInfo.TryRemove(player.Slot, out _);
@@ -325,6 +328,20 @@ namespace WeaponPaints
 				
 			CAttributeListSetOrAddAttributeValueByName.Invoke(weapon.AttributeManager.Item.AttributeList.Handle, "kill eater", ViewAsFloat((uint)weaponInfo.StatTrakCount));
 			CAttributeListSetOrAddAttributeValueByName.Invoke(weapon.AttributeManager.Item.AttributeList.Handle, "kill eater score type", 0);
+
+			if (WeaponSync != null)
+			{
+				var attackerInfo = new PlayerInfo
+				{
+					UserId = player.UserId,
+					Slot = player.Slot,
+					Index = (int)player.Index,
+					SteamId = player.SteamID.ToString(),
+					Name = player.PlayerName,
+					IpAddress = player.IpAddress?.Split(":")[0]
+				};
+				_ = Task.Run(async () => await WeaponSync.SyncStatTrakToDatabase(attackerInfo));
+			}
 
 			return HookResult.Continue;
 		}

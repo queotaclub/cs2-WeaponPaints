@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Text;
 using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
@@ -10,6 +11,9 @@ internal class WeaponSynchronization
 {
 	private readonly WeaponPaintsConfig _config;
 	private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+	// ponytail: debounce writebacks per steamid; ceiling = one request / 5s under spray
+	private static readonly ConcurrentDictionary<string, long> LastStatTrakSyncMs = new();
+	private const int StatTrakDebounceMs = 5000;
 
 	internal WeaponSynchronization(WeaponPaintsConfig config)
 	{
@@ -70,8 +74,116 @@ internal class WeaponSynchronization
 		}
 	}
 
-	// ponytail: StatTrak writeback dropped — website owns counts (v1)
-	internal Task SyncStatTrakToDatabase(PlayerInfo player) => Task.CompletedTask;
+	/// <summary>
+	/// Persist StatTrak flags + kill counts to Rails. Call on disconnect (force) and after kills (debounced).
+	/// </summary>
+	internal async Task SyncStatTrakToDatabase(PlayerInfo? player, bool force = false)
+	{
+		try
+		{
+			if (player == null || string.IsNullOrEmpty(player.SteamId))
+				return;
+			if (string.IsNullOrWhiteSpace(_config.ApiUrl) || string.IsNullOrWhiteSpace(_config.ApiKey))
+				return;
+			if (!WeaponPaints.GPlayerWeaponsInfo.TryGetValue(player.Slot, out var byTeam) || byTeam.IsEmpty)
+				return;
+
+			if (!force)
+			{
+				var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+				var last = LastStatTrakSyncMs.GetOrAdd(player.SteamId, 0);
+				if (now - last < StatTrakDebounceMs)
+					return;
+				LastStatTrakSyncMs[player.SteamId] = now;
+			}
+
+			var weapons = CollectStatTrakUpdates(byTeam, allPainted: force);
+			if (weapons.Count == 0)
+				return;
+
+			var baseUrl = _config.ApiUrl.TrimEnd('/');
+			var url = $"{baseUrl}/api/game/skins/{player.SteamId}";
+			var payload = new JObject { ["weapons"] = weapons };
+
+			using var request = new HttpRequestMessage(HttpMethod.Patch, url);
+			request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+			request.Content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json");
+
+			using var response = await Http.SendAsync(request).ConfigureAwait(false);
+			if (!response.IsSuccessStatusCode)
+				Utility.Log($"StatTrak sync HTTP {(int)response.StatusCode} for {player.SteamId}");
+		}
+		catch (Exception ex)
+		{
+			Utility.Log($"StatTrak sync error: {ex.Message}");
+		}
+	}
+
+	private static JArray CollectStatTrakUpdates(
+		ConcurrentDictionary<CsTeam, ConcurrentDictionary<int, WeaponInfo>> byTeam,
+		bool allPainted = false)
+	{
+		var updates = new JArray();
+		var emitted = new HashSet<WeaponInfo>(ReferenceEqualityComparer.Instance);
+
+		byTeam.TryGetValue(CsTeam.Terrorist, out var tWeapons);
+		byTeam.TryGetValue(CsTeam.CounterTerrorist, out var ctWeapons);
+
+		var defindexes = new HashSet<int>();
+		if (tWeapons != null)
+			foreach (var k in tWeapons.Keys) defindexes.Add(k);
+		if (ctWeapons != null)
+			foreach (var k in ctWeapons.Keys) defindexes.Add(k);
+
+		foreach (var defindex in defindexes)
+		{
+			WeaponInfo? tInfo = null;
+			WeaponInfo? ctInfo = null;
+			tWeapons?.TryGetValue(defindex, out tInfo);
+			ctWeapons?.TryGetValue(defindex, out ctInfo);
+
+			if (tInfo != null && ctInfo != null && ReferenceEquals(tInfo, ctInfo))
+			{
+				TryAddUpdate(updates, emitted, defindex, 0, tInfo, allPainted);
+				continue;
+			}
+
+			if (tInfo != null)
+				TryAddUpdate(updates, emitted, defindex, 2, tInfo, allPainted);
+			if (ctInfo != null)
+				TryAddUpdate(updates, emitted, defindex, 3, ctInfo, allPainted);
+		}
+
+		return updates;
+	}
+
+	private static void TryAddUpdate(
+		JArray updates,
+		HashSet<WeaponInfo> emitted,
+		int defindex,
+		int team,
+		WeaponInfo info,
+		bool allPainted)
+	{
+		if (info.Paint <= 0)
+			return;
+		if (!IsStatTrakable(defindex))
+			return;
+		// Debounced kill sync: only enabled StatTrak (or weapons with kills).
+		// Forced flush (disconnect): every painted ST-capable gun so counts persist.
+		if (!allPainted && !info.StatTrak && info.StatTrakCount <= 0)
+			return;
+		if (!emitted.Add(info))
+			return;
+
+		updates.Add(new JObject
+		{
+			["weapon_defindex"] = defindex,
+			["weapon_team"] = team,
+			["weapon_stattrak"] = true,
+			["weapon_stattrak_count"] = info.StatTrakCount
+		});
+	}
 
 	private static CsTeam TeamFromInt(int team) => team switch
 	{
@@ -79,6 +191,19 @@ internal class WeaponSynchronization
 		3 => CsTeam.CounterTerrorist,
 		_ => CsTeam.None,
 	};
+
+	/// <summary>
+	/// CS2 StatTrak exists for Weapon + Melee paints. Not gloves / grenades / C4.
+	/// Zeus (31) has StatTrak skins since Kilowatt Case (2024).
+	/// </summary>
+	private static bool IsStatTrakable(int defindex)
+	{
+		if (defindex >= 500 && defindex < 5000) return true; // knives
+		if (defindex is 4725 or (>= 5027 and <= 5035)) return false; // gloves
+		if (defindex is >= 43 and <= 49) return false; // nades + c4
+		if (defindex is 37 or 41 or 42 or 59) return false; // shield / egg / default knives
+		return defindex is (>= 1 and <= 40) or (>= 60 and <= 64);
+	}
 
 	private static IEnumerable<JObject> AsObjectList(JToken? token)
 	{
@@ -210,7 +335,6 @@ internal class WeaponSynchronization
 			float weaponWear = row.Value<float?>("weapon_wear") ?? 0f;
 			int weaponSeed = row.Value<int?>("weapon_seed") ?? 0;
 			string weaponNameTag = row.Value<string>("weapon_nametag") ?? "";
-			bool weaponStatTrak = row.Value<bool?>("weapon_stattrak") ?? false;
 			int weaponStatTrakCount = row.Value<int?>("weapon_stattrak_count") ?? 0;
 			var weaponTeam = TeamFromInt(row.Value<int?>("weapon_team") ?? 0);
 
@@ -223,7 +347,8 @@ internal class WeaponSynchronization
 				Wear = weaponWear,
 				Nametag = weaponNameTag,
 				KeyChain = keyChainInfo,
-				StatTrak = weaponStatTrak,
+				// Guns (incl. Zeus) + knives only — gloves/utility have no StatTrak in CS2.
+				StatTrak = weaponPaintId > 0 && IsStatTrakable(weaponDefIndex),
 				StatTrakCount = weaponStatTrakCount,
 			};
 
