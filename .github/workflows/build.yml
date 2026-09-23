@@ -19,7 +19,8 @@ env:
   PROJECT_PATH: "WeaponPaints.csproj"
   PROJECT_NAME: "WeaponPaints"
   OUTPUT_PATH: "./WeaponPaints"
-  TARGET_PLATFORM: "windows"  # Set to "linux" or "windows" based on your target platform
+  # roflmuffin/CounterStrikeSharp PR 1433 (CS2 1.41.8.2). Not on NuGet yet.
+  CSSHARP_SHA: "2d1b3d7c96e7aeb618e4346f69229ee2fbfbc907"
 
 jobs:
   build:
@@ -27,15 +28,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
+    - name: Pack CounterStrikeSharp.API
+      run: bash .github/pack-cssharp.sh
     - name: Restore
       run: dotnet restore
     - name: Build
-      run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
+      run: dotnet build ${{ env.PROJECT_PATH }} -c Release -o ${{ env.OUTPUT_PATH }}
 
   publish:
     if: github.event_name == 'push'
@@ -43,22 +46,24 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
+    - name: Pack CounterStrikeSharp.API
+      run: bash .github/pack-cssharp.sh
     - name: Restore
       run: dotnet restore
     - name: Build
-      run: dotnet build ${{ env.PROJECT_PATH }} -c WeaponPaints -o ${{ env.OUTPUT_PATH }}
+      run: dotnet build ${{ env.PROJECT_PATH }} -c Release -o ${{ env.OUTPUT_PATH }}
     - name: Clean files
       run: |
         rm -f \
           ${{ env.OUTPUT_PATH }}/CounterStrikeSharp.API.dll \
           ${{ env.OUTPUT_PATH }}/McMaster.NETCore.Plugins.dll \
           ${{ env.OUTPUT_PATH }}/Microsoft.DotNet.PlatformAbstractions.dll \
-          ${{ env.OUTPUT_PATH }}/Microsoft.Extensions.DependencyModel.dll \
+          ${{ env.OUTPUT_PATH }}/Microsoft.Extensions.DependencyModel.dll
     - name: Copy skins
       run: cp -R website/data ${{ env.OUTPUT_PATH }}
     - name: Zip
@@ -80,3 +85,6 @@ jobs:
         tag: "build-${{ env.BUILD_NUMBER }}"
         body: |
           Place the plugin in game/csgo/addons/counterstrikesharp/plugins/WeaponPaints
+
+          Built for CS2 1.41.8.2 against CounterStrikeSharp PR #1433 (`2d1b3d7`).
+          The server must run that CounterStrikeSharp build. Stock NuGet 1.0.374 does not include the gamedata fix.
