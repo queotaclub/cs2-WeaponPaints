@@ -13,6 +13,8 @@ git -C "$DEST" sparse-checkout set managed
 git -C "$DEST" fetch --depth 1 origin "$SHA"
 git -C "$DEST" checkout --detach FETCH_HEAD
 printf '<Project></Project>\n' > "$DEST/Directory.Build.props"
+# Parent nuget.config points at this folder. It must exist before restore.
+mkdir -p "$DEST/nupkg"
 
 dotnet pack "$DEST/managed/CounterStrikeSharp.API/CounterStrikeSharp.API.csproj" \
   -c Release \
