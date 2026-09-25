@@ -2,10 +2,12 @@
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Entities.Constants;
 using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using Newtonsoft.Json.Linq;
 
 namespace WeaponPaints
@@ -85,7 +87,7 @@ namespace WeaponPaints
 						w["paint"]?.ToObject<int>() == fallbackPaintKit)
 					.ToList();
 				
-				isLegacyModel = skinInfo.Count <= 0 || skinInfo[0].Value<bool>("legacy_model");
+				isLegacyModel = IsLegacyModel(skinInfo);
 				UpdatePlayerWeaponMeshGroupMask(player, weapon, isLegacyModel);
 				return;
 			}
@@ -133,7 +135,7 @@ namespace WeaponPaints
 					w["paint"]?.ToObject<int>() == fallbackPaintKit)
 				.ToList();
 				
-			isLegacyModel = skinInfo.Count <= 0 || skinInfo[0].Value<bool>("legacy_model");
+			isLegacyModel = IsLegacyModel(skinInfo);
 			UpdatePlayerWeaponMeshGroupMask(player, weapon, isLegacyModel);
 		}
 		
@@ -423,11 +425,16 @@ namespace WeaponPaints
 					CAttributeListSetOrAddAttributeValueByName.Invoke(item.AttributeList.Handle, "set item texture wear", weaponInfo.Wear);
 
 					item.Initialized = true;
-				
+					pawn.EconGlovesChanged++;
+
 					//force gloves model refresh to prevent model overlap
 					player.ExecuteClientCommand("lastinv");
 					SetBodygroup(pawn, "first_or_third_person", 0);
-					AddTimer(0.2f, () => SetBodygroup(pawn, "first_or_third_person", 1), TimerFlags.STOP_ON_MAPCHANGE);
+					AddTimer(0.2f, () =>
+					{
+						if (!pawn.IsValid) return;
+						SetBodygroup(pawn, "first_or_third_person", 1);
+					}, TimerFlags.STOP_ON_MAPCHANGE);
 				}
 				catch (Exception) { }
 			}, TimerFlags.STOP_ON_MAPCHANGE);
@@ -451,29 +458,106 @@ namespace WeaponPaints
 			return int.TryParse(randomWeapon["paint"]?.ToString(), out var paintValue) ? paintValue : 0;
 		}
 
+		// A paint missing from the catalog is a newer skin. Forcing the legacy mesh
+		// puts that finish on the old model, which is the "paint looks off" case.
+		private static bool IsLegacyModel(List<JObject> skinInfo)
+		{
+			if (skinInfo.Count > 0)
+				return skinInfo[0].Value<bool>("legacy_model");
+			return SkinsList.Count == 0;
+		}
+
 		//xstage idea on css discord
 		public static void SubclassChange(CBasePlayerWeapon weapon, ushort itemD)
 		{
-			weapon.AcceptInput("ChangeSubclass", value: itemD.ToString());
+			CallAcceptInput(weapon, "ChangeSubclass", itemD.ToString());
 		}
 
-		public static void SetBodygroup(CCSPlayerPawn pawn, string group, int value)
+		public static void SetBodygroup(CBaseEntity entity, string group, int value)
 		{
-			pawn.AcceptInput("SetBodygroup", value:$"{group},{value}");
+			CallAcceptInput(entity, "SetBodygroup", $"{group},{value}");
 		}
 
 		private void UpdateWeaponMeshGroupMask(CBaseEntity weapon, bool isLegacy = false)
 		{
-				if (weapon.CBodyComponent?.SceneNode == null) return;
-				//var skeleton = weapon.CBodyComponent.SceneNode.GetSkeletonInstance();
-				// skeleton.ModelState.MeshGroupMask = isLegacy ? 2UL : 1UL;
+			// body,0 is the new mesh (bit 1). body,1 is the legacy mesh (bit 2).
+			// Write the mask as well as AcceptInput: the input is what updates the
+			// viewmodel, and the mask still applies when that signature is missing.
+			CallAcceptInput(weapon, "SetBodygroup", $"body,{(isLegacy ? 1 : 0)}");
+			SetMeshBit(weapon, isLegacy ? 2UL : 1UL);
+		}
 
-				weapon.AcceptInput("SetBodygroup", value: $"body,{(isLegacy ? 1 : 0)}");
+		// Official 1.0.375 CEntityInstance::AcceptInput. Kept under our own gamedata key
+		// because DatHost overwrites gamedata.json on boot. variant_t is an 8-byte
+		// payload, uint8 type at +8 (FIELD_CSTRING = 30), uint16 flags at +10.
+		private static MemoryFunctionVoid<nint, string, nint, nint, nint, int, nint>? _acceptInput;
+		private static bool _acceptInputBroken;
+
+		private static bool CallAcceptInput(CEntityInstance entity, string input, string value)
+		{
+			if (_acceptInputBroken || !entity.IsValid) return false;
+
+			try
+			{
+				_acceptInput ??= new MemoryFunctionVoid<nint, string, nint, nint, nint, int, nint>(
+					GameData.GetSignature("WeaponPaints_AcceptInput"));
+				if (_acceptInput.Handle == IntPtr.Zero)
+				{
+					_acceptInputBroken = true;
+					return false;
+				}
+
+				var text = Marshal.StringToHGlobalAnsi(value);
+				var variant = Marshal.AllocHGlobal(16);
+				try
+				{
+					for (var i = 0; i < 16; i++)
+						Marshal.WriteByte(variant, i, 0);
+					Marshal.WriteIntPtr(variant, text);
+					Marshal.WriteByte(variant, 8, 30);
+					_acceptInput.Invoke(entity.Handle, input, IntPtr.Zero, IntPtr.Zero, variant, 0, IntPtr.Zero);
+					return true;
+				}
+				finally
+				{
+					Marshal.FreeHGlobal(variant);
+					Marshal.FreeHGlobal(text);
+				}
+			}
+			catch (Exception ex)
+			{
+				_acceptInputBroken = true;
+				Instance.Logger.LogWarning("AcceptInput unavailable: " + ex.Message);
+				return false;
+			}
+		}
+
+		private static void SetMeshBit(CBaseEntity entity, ulong bit)
+		{
+			var node = entity.CBodyComponent?.SceneNode;
+			if (node == null) return;
+
+			try
+			{
+				var skeleton = node.GetSkeletonInstance();
+				var mask = (skeleton.ModelState.MeshGroupMask & ~3UL) | bit;
+				if (skeleton.ModelState.MeshGroupMask != mask)
+					skeleton.ModelState.MeshGroupMask = mask;
+				Utilities.SetStateChanged(entity, "CBaseEntity", "m_CBodyComponent");
+			}
+			catch (Exception)
+			{
+			}
 		}
 
 		private void UpdatePlayerWeaponMeshGroupMask(CCSPlayerController player, CBasePlayerWeapon weapon, bool isLegacy)
 		{
 			UpdateWeaponMeshGroupMask(weapon, isLegacy);
+			Server.NextFrame(() =>
+			{
+				if (weapon.IsValid)
+					UpdateWeaponMeshGroupMask(weapon, isLegacy);
+			});
 		}
 
 		private static void GivePlayerAgent(CCSPlayerController player)
