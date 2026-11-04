@@ -270,6 +270,8 @@ Restart the server after changing this option.
 | `DatabasePassword` | `""` | MySQL password. |
 | `DatabaseName` | `""` | MySQL database name. |
 | `CmdRefreshCooldownSeconds` | `3` | Shared cooldown used by refresh and cosmetic menu commands. |
+| `LiveRefresh` | `true` | Apply loadout changes made on the website without `!wp`: long-polls the API's `POST /api/game/skins/changes` and re-equips changed players (Fightback Play). Skins APIs that send no `rev` are never polled. |
+| `LiveRefreshWaitSeconds` | `25` | How long each live-refresh request waits for a change (5–30). Idle cost: one request per this many seconds per server. |
 | `Website` | `"example.com/skins"` | Website printed by the `!ws` command. |
 | `MenuType` | `"selectable"` | MenuManager menu implementation to use. |
 

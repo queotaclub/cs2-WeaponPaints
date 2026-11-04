@@ -1,7 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
@@ -11,6 +13,11 @@ internal class WeaponSynchronization
 {
 	private readonly WeaponPaintsConfig _config;
 	private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+	// The live-refresh long poll holds a request open for LiveRefreshWaitSeconds; each
+	// request gets its own deadline.
+	private static readonly HttpClient LongPoll = new() { Timeout = Timeout.InfiniteTimeSpan };
+	private const int LiveDebounceMs = 1500;
+	private CancellationTokenSource _wake = new();
 	// ponytail: debounce writebacks per steamid; ceiling = one request / 5s under spray
 	private static readonly ConcurrentDictionary<string, long> LastStatTrakSyncMs = new();
 	private const int StatTrakDebounceMs = 5000;
@@ -20,17 +27,21 @@ internal class WeaponSynchronization
 		_config = config;
 	}
 
-	internal async Task GetPlayerData(PlayerInfo? player)
+	/// <summary>
+	/// Fetch the player's loadout and replace what's in memory (an item removed on the
+	/// website disappears). Records the API's `rev` for live refresh when it sends one.
+	/// </summary>
+	internal async Task<bool> GetPlayerData(PlayerInfo? player)
 	{
 		try
 		{
 			if (player == null || string.IsNullOrEmpty(player.SteamId))
-				return;
+				return false;
 
 			if (string.IsNullOrWhiteSpace(_config.ApiUrl) || string.IsNullOrWhiteSpace(_config.ApiKey))
 			{
 				Utility.Log("ApiUrl/ApiKey not configured — skipping skin load");
-				return;
+				return false;
 			}
 
 			var baseUrl = _config.ApiUrl.TrimEnd('/');
@@ -43,7 +54,7 @@ internal class WeaponSynchronization
 			if (!response.IsSuccessStatusCode)
 			{
 				Utility.Log($"Skins API HTTP {(int)response.StatusCode} for {player.SteamId}");
-				return;
+				return false;
 			}
 
 			var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -52,8 +63,12 @@ internal class WeaponSynchronization
 			if (data == null)
 			{
 				Utility.Log($"Skins API missing data for {player.SteamId}");
-				return;
+				return false;
 			}
+
+			// Disconnected (or the slot changed hands) while we were fetching.
+			if (!WeaponPaints.IsTracked(player))
+				return false;
 
 			if (_config.Additional.KnifeEnabled)
 				ApplyKnives(player, data["knife"]);
@@ -67,10 +82,119 @@ internal class WeaponSynchronization
 				ApplySkins(player, data["skins"] as JArray);
 			if (_config.Additional.PinsEnabled)
 				ApplyPins(player, data["pins"]);
+
+			if (root["rev"] is JValue { Type: JTokenType.Integer } rev)
+				WeaponPaints.RecordRev(player, rev.Value<long>());
+			return true;
 		}
 		catch (Exception ex)
 		{
 			Console.WriteLine($"An error occurred: {ex.Message}");
+			return false;
+		}
+	}
+
+	/// <summary>Cut the current long poll short so it restarts with the new player set.</summary>
+	internal void WakeLiveLoop() => Interlocked.Exchange(ref _wake, new CancellationTokenSource()).Cancel();
+
+	/// <summary>
+	/// Live refresh loop (thread pool). Sends the revs of the connected players to
+	/// POST /api/game/skins/changes, which answers as soon as one of their loadouts changes
+	/// (or after the wait, empty). Changed players are refetched after a short debounce and
+	/// re-equipped on the game thread. Idle cost: one request per wait per server.
+	/// </summary>
+	internal async Task RunLiveUpdates(CancellationToken stop)
+	{
+		var url = $"{_config.ApiUrl.TrimEnd('/')}/api/game/skins/changes";
+		var waitSeconds = Math.Clamp(_config.LiveRefreshWaitSeconds, 5, 30);
+		var failures = 0;
+
+		while (!stop.IsCancellationRequested)
+		{
+			var wake = _wake.Token;
+			var known = WeaponPaints.LoadoutRevs.ToArray();
+			try
+			{
+				if (known.Length == 0)
+				{
+					// Nobody to watch (or the API sends no revs): sleep until a player's rev is recorded.
+					await Sleep(Timeout.InfiniteTimeSpan, stop, wake).ConfigureAwait(false);
+					continue;
+				}
+
+				using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop, wake);
+				deadline.CancelAfter(TimeSpan.FromSeconds(waitSeconds + 15));
+
+				var payload = new JObject
+				{
+					["players"] = new JObject(known.Select(kv => new JProperty(kv.Key, kv.Value))),
+					["wait"] = waitSeconds,
+				};
+				using var request = new HttpRequestMessage(HttpMethod.Post, url)
+				{
+					Content = new StringContent(payload.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json"),
+				};
+				request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+
+				using var response = await LongPoll.SendAsync(request, deadline.Token).ConfigureAwait(false);
+				if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+				{
+					Utility.Log("Live refresh: this skins API has no /api/game/skins/changes; checking again in 10 min");
+					await Sleep(TimeSpan.FromMinutes(10), stop, CancellationToken.None).ConfigureAwait(false);
+					continue;
+				}
+				if (!response.IsSuccessStatusCode)
+					throw new HttpRequestException($"HTTP {(int)response.StatusCode}");
+
+				var body = JObject.Parse(await response.Content.ReadAsStringAsync(deadline.Token).ConfigureAwait(false));
+				failures = 0;
+				if (body["changed"] is not JObject changed || !changed.HasValues)
+					continue;
+
+				// Let a burst of edits settle (several saves, sticker tweaks): one refresh per burst.
+				await Sleep(TimeSpan.FromMilliseconds(LiveDebounceMs), stop, CancellationToken.None).ConfigureAwait(false);
+
+				var allFetched = true;
+				foreach (var steamId in changed.Properties().Select(p => p.Name))
+				{
+					if (!WeaponPaints.LivePlayers.TryGetValue(steamId, out var info)) continue;
+					if (await GetPlayerData(info).ConfigureAwait(false))
+						Server.NextFrame(() => WeaponPaints.Instance.ApplyLoadout(info, announce: true));
+					else
+						allFetched = false;
+				}
+				// A failed fetch leaves the old rev, so the next poll answers at once: pace it.
+				if (!allFetched)
+					await Sleep(TimeSpan.FromSeconds(5), stop, CancellationToken.None).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException) when (stop.IsCancellationRequested)
+			{
+				break;
+			}
+			catch (OperationCanceledException) when (wake.IsCancellationRequested)
+			{
+				// The player set changed: poll again now.
+			}
+			catch (Exception ex)
+			{
+				failures++;
+				var delay = TimeSpan.FromSeconds(Math.Min(60, 5 * failures));
+				if (failures <= 3 || failures % 20 == 0)
+					Utility.Log($"Live refresh: {ex.Message}; retrying in {delay.TotalSeconds:0}s");
+				await Sleep(delay, stop, CancellationToken.None).ConfigureAwait(false);
+			}
+		}
+	}
+
+	private static async Task Sleep(TimeSpan delay, CancellationToken stop, CancellationToken wake)
+	{
+		using var either = CancellationTokenSource.CreateLinkedTokenSource(stop, wake);
+		try
+		{
+			await Task.Delay(delay, either.Token).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
 		}
 	}
 
@@ -222,15 +346,27 @@ internal class WeaponSynchronization
 			yield return single;
 	}
 
+	// Swap a player's entry for a freshly built one (or drop it when empty), so a refresh
+	// replaces the loadout instead of merging into the old one.
+	private static void Replace<TKey, TValue>(
+		ConcurrentDictionary<int, ConcurrentDictionary<TKey, TValue>> map, int slot,
+		ConcurrentDictionary<TKey, TValue> fresh) where TKey : notnull
+	{
+		if (fresh.IsEmpty)
+			map.TryRemove(slot, out _);
+		else
+			map[slot] = fresh;
+	}
+
 	private void ApplyKnives(PlayerInfo player, JToken? token)
 	{
+		var playerKnives = new ConcurrentDictionary<CsTeam, string>();
 		foreach (var row in AsObjectList(token))
 		{
 			var knife = row.Value<string>("knife");
 			if (string.IsNullOrEmpty(knife)) continue;
 
 			var weaponTeam = TeamFromInt(row.Value<int?>("weapon_team") ?? 0);
-			var playerKnives = WeaponPaints.GPlayersKnife.GetOrAdd(player.Slot, _ => new ConcurrentDictionary<CsTeam, string>());
 
 			if (weaponTeam == CsTeam.None)
 			{
@@ -242,17 +378,18 @@ internal class WeaponSynchronization
 				playerKnives[weaponTeam] = knife;
 			}
 		}
+		Replace(WeaponPaints.GPlayersKnife, player.Slot, playerKnives);
 	}
 
 	private void ApplyGloves(PlayerInfo player, JToken? token)
 	{
+		var playerGloves = new ConcurrentDictionary<CsTeam, ushort>();
 		foreach (var row in AsObjectList(token))
 		{
 			var def = row.Value<int?>("weapon_defindex");
 			if (def == null) continue;
 
 			var weaponTeam = TeamFromInt(row.Value<int?>("weapon_team") ?? 0);
-			var playerGloves = WeaponPaints.GPlayersGlove.GetOrAdd(player.Slot, _ => new ConcurrentDictionary<CsTeam, ushort>());
 
 			if (weaponTeam == CsTeam.None)
 			{
@@ -264,26 +401,29 @@ internal class WeaponSynchronization
 				playerGloves[weaponTeam] = (ushort)def.Value;
 			}
 		}
+		Replace(WeaponPaints.GPlayersGlove, player.Slot, playerGloves);
 	}
 
 	private void ApplyAgents(PlayerInfo player, JToken? token)
 	{
-		if (token is not JObject agents) return;
-		var agentCt = agents.Value<string>("agent_ct");
-		var agentT = agents.Value<string>("agent_t");
+		var agents = token as JObject;
+		var agentCt = agents?.Value<string>("agent_ct");
+		var agentT = agents?.Value<string>("agent_t");
 		if (!string.IsNullOrEmpty(agentCt) || !string.IsNullOrEmpty(agentT))
 			WeaponPaints.GPlayersAgent[player.Slot] = (agentCt, agentT);
+		else
+			WeaponPaints.GPlayersAgent.TryRemove(player.Slot, out _);
 	}
 
 	private void ApplyMusic(PlayerInfo player, JToken? token)
 	{
+		var playerMusic = new ConcurrentDictionary<CsTeam, ushort>();
 		foreach (var row in AsObjectList(token))
 		{
 			var musicId = row.Value<int?>("music_id");
 			if (musicId == null) continue;
 
 			var weaponTeam = TeamFromInt(row.Value<int?>("weapon_team") ?? 0);
-			var playerMusic = WeaponPaints.GPlayersMusic.GetOrAdd(player.Slot, _ => new ConcurrentDictionary<CsTeam, ushort>());
 
 			if (weaponTeam == CsTeam.None)
 			{
@@ -295,17 +435,18 @@ internal class WeaponSynchronization
 				playerMusic[weaponTeam] = (ushort)musicId.Value;
 			}
 		}
+		Replace(WeaponPaints.GPlayersMusic, player.Slot, playerMusic);
 	}
 
 	private void ApplyPins(PlayerInfo player, JToken? token)
 	{
+		var playerPins = new ConcurrentDictionary<CsTeam, ushort>();
 		foreach (var row in AsObjectList(token))
 		{
 			var id = row.Value<int?>("id") ?? row.Value<int?>("pin_id");
 			if (id == null) continue;
 
 			var weaponTeam = TeamFromInt(row.Value<int?>("weapon_team") ?? 0);
-			var playerPins = WeaponPaints.GPlayersPin.GetOrAdd(player.Slot, _ => new ConcurrentDictionary<CsTeam, ushort>());
 
 			if (weaponTeam == CsTeam.None)
 			{
@@ -317,16 +458,22 @@ internal class WeaponSynchronization
 				playerPins[weaponTeam] = (ushort)id.Value;
 			}
 		}
+		Replace(WeaponPaints.GPlayersPin, player.Slot, playerPins);
 	}
 
 	private void ApplySkins(PlayerInfo player, JArray? skins)
 	{
-		if (skins == null) return;
+		// Built fresh and swapped in at the end. StatTrak kills counted in game since the
+		// last (debounced) sync are kept: the API's count can lag behind memory.
+		WeaponPaints.GPlayerWeaponsInfo.TryGetValue(player.Slot, out var previous);
+		int KeptCount(CsTeam team, int defindex, int fromApi) =>
+			previous != null && previous.TryGetValue(team, out var byDef) && byDef.TryGetValue(defindex, out var old)
+				? Math.Max(old.StatTrakCount, fromApi)
+				: fromApi;
 
-		var playerWeapons = WeaponPaints.GPlayerWeaponsInfo.GetOrAdd(player.Slot,
-			_ => new ConcurrentDictionary<CsTeam, ConcurrentDictionary<int, WeaponInfo>>());
+		var playerWeapons = new ConcurrentDictionary<CsTeam, ConcurrentDictionary<int, WeaponInfo>>();
 
-		foreach (var token in skins)
+		foreach (var token in skins ?? [])
 		{
 			if (token is not JObject row) continue;
 
@@ -349,7 +496,7 @@ internal class WeaponSynchronization
 				KeyChain = keyChainInfo,
 				// Guns (incl. Zeus) + knives only — gloves/utility have no StatTrak in CS2.
 				StatTrak = weaponPaintId > 0 && IsStatTrakable(weaponDefIndex),
-				StatTrakCount = weaponStatTrakCount,
+				StatTrakCount = KeptCount(weaponTeam == CsTeam.None ? CsTeam.Terrorist : weaponTeam, weaponDefIndex, weaponStatTrakCount),
 			};
 
 			for (int i = 0; i <= 4; i++)
@@ -395,6 +542,11 @@ internal class WeaponSynchronization
 				teamWeapons[weaponDefIndex] = weaponInfo;
 			}
 		}
+
+		if (playerWeapons.IsEmpty)
+			WeaponPaints.GPlayerWeaponsInfo.TryRemove(player.Slot, out _);
+		else
+			WeaponPaints.GPlayerWeaponsInfo[player.Slot] = playerWeapons;
 	}
 
 	private static KeyChainInfo ParseKeyChain(string? raw)

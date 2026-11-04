@@ -101,6 +101,15 @@ namespace WeaponPaints
 		[JsonPropertyName("CmdRefreshCooldownSeconds")]
 		public int CmdRefreshCooldownSeconds { get; set; } = 3;
 
+		// Apply loadout changes from the website without !wp: long-polls the API's
+		// POST /api/game/skins/changes (Fightback Play). APIs without it (no `rev` in the
+		// skins payload) are never polled.
+		[JsonPropertyName("LiveRefresh")]
+		public bool LiveRefresh { get; set; } = true;
+
+		[JsonPropertyName("LiveRefreshWaitSeconds")]
+		public int LiveRefreshWaitSeconds { get; set; } = 25;
+
 		[JsonPropertyName("Website")]
 		public string Website { get; set; } = "queota.club/loadout";
 

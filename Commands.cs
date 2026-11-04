@@ -34,16 +34,9 @@ public partial class WeaponPaints
 			{
 				CommandsCooldown[player.Slot] = DateTime.UtcNow.AddSeconds(Config.CmdRefreshCooldownSeconds);
 
-				if (WeaponSync != null)
-				{
-					_ = Task.Run(async () => await WeaponSync.GetPlayerData(playerInfo));
-
-					GivePlayerGloves(player);
-					RefreshWeapons(player);
-					GivePlayerAgent(player);
-					GivePlayerMusicKit(player);
-					AddTimer(0.15f, () => GivePlayerPin(player));
-				}
+				// Fetch first, then re-equip on the game thread (it used to re-equip at once,
+				// with the loadout from before the fetch).
+				RefreshFromApi(playerInfo, announce: false);
 
 				if (!string.IsNullOrEmpty(Localizer["wp_command_refresh_done"]))
 				{
@@ -182,16 +175,7 @@ public partial class WeaponPaints
 					IpAddress = targetPlayer.IpAddress?.Split(":")[0]
 				};
 
-				if (WeaponSync != null)
-				{
-					_ = Task.Run(async () => await WeaponSync.GetPlayerData(playerInfo));
-				}
-
-				GivePlayerGloves(targetPlayer);
-				RefreshWeapons(targetPlayer);
-				GivePlayerAgent(targetPlayer);
-				GivePlayerMusicKit(targetPlayer);
-				AddTimer(0.15f, () => GivePlayerPin(targetPlayer));
+				RefreshFromApi(playerInfo, announce: false);
 
 				if (!string.IsNullOrEmpty(Localizer["wp_command_refresh_done"]))
 				{

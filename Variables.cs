@@ -83,6 +83,11 @@ public partial class WeaponPaints
 	internal static List<JObject> AgentsList = [];
 	internal static List<JObject> MusicList = [];
 	internal static WeaponSynchronization? WeaponSync;
+	// Live refresh: connected players by steamid64 (slot-checked before writing their
+	// loadout) and the loadout rev last fetched for each.
+	internal static readonly ConcurrentDictionary<string, PlayerInfo> LivePlayers = new();
+	internal static readonly ConcurrentDictionary<string, long> LoadoutRevs = new();
+	private CancellationTokenSource? _liveCts;
 	private static bool _gBCommandsAllowed = true;
 	private readonly Dictionary<int, string> _playerWeaponImage = new();
 

@@ -33,6 +33,7 @@ namespace WeaponPaints
 
 			try
 			{
+				TrackPlayer(playerInfo);
 				_ = Task.Run(async () => await WeaponSync.GetPlayerData(playerInfo));
 				/*
 				if (Config.Additional.SkinEnabled)
@@ -118,6 +119,7 @@ namespace WeaponPaints
 			
 			_temporaryPlayerWeaponWear.TryRemove(player.Slot, out _);
 			CommandsCooldown.Remove(player.Slot);
+			UntrackPlayer(playerInfo.SteamId);
 			Players.Remove(player);
 
 			return HookResult.Continue;

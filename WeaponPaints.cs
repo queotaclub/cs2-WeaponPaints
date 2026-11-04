@@ -20,7 +20,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 	public override string ModuleAuthor => "Nereziel & daffyy";
 	public override string ModuleDescription => "Skin, gloves, agents and knife selector, standalone and web-based";
 	public override string ModuleName => "WeaponPaints";
-	public override string ModuleVersion => "3.4-queota";
+	public override string ModuleVersion => "3.5-queota";
 
 	public override void Load(bool hotReload)
 	{
@@ -53,6 +53,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 					IpAddress = player?.IpAddress?.Split(":")[0]
 				};
 
+				TrackPlayer(playerInfo);
 				_ = Task.Run(async () =>
 				{
 					if (WeaponSync != null) await WeaponSync.GetPlayerData(playerInfo);
@@ -67,10 +68,13 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 		Utility.LoadPinsFromFile(ModuleDirectory + $"/data/collectibles_{_config.SkinsLanguage}.json", Logger);
 
 		RegisterListeners();
+		StartLiveRefresh();
 	}
 
 	public override void Unload(bool hotReload)
 	{
+		StopLiveRefresh();
+
 		// Native hook outlives the plugin's AssemblyLoadContext; without this, css_plugins reload
 		// leaves the old OnGiveNamedItemPost delegate registered and the next GiveNamedItem crashes the server.
 		if (!_giveNamedItemHooked) return;
