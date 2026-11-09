@@ -1,5 +1,5 @@
 {
-	"wp_prefix": "{lightblue}[QUEOTA.club] {default}",
+	"wp_prefix": "[{red}FIGHTBACK.gg{default}] ",
 	"wp_info_website": "Visit {lime}{0}{default} where you can change skins",
 	"wp_info_refresh": "Type {lime}!wp{default} to synchronize chosen skins",
 	"wp_info_knife": "Type {lime}!knife{default} to open knife menu",
@@ -10,6 +10,7 @@
 	"wp_command_cooldown": "{lightred}You can't refresh weapon paints right now",
 	"wp_command_refresh_done": "{lime}Refreshing weapon paints",
 	"wp_live_refresh": "{lime}Loadout updated from the website",
+	"wp_live_refresh_next": "{lime}Loadout updated from the website{default}: it applies on your next spawn",
 	"wp_knife_menu_select": "You have chosen {lime}{0}{default} as your knife",
 	"wp_knife_menu_kill": "",
 	"wp_knife_menu_title": "Knife Menu",

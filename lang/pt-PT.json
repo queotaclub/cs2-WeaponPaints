@@ -1,5 +1,5 @@
 {
-	"wp_prefix": "{lightblue}[QUEOTA.club] {default}",
+	"wp_prefix": "[{red}FIGHTBACK.gg{default}] ",
 	"wp_info_website": "Visite {lime}{0}{default}, onde pode alterar as skins",
 	"wp_info_refresh": "Digite {lime}!wp{default} para sincronizar as skins escolhidas",
 	"wp_info_knife": "Digite {lime}!knife{default} para abrir o menu de facas",
@@ -10,6 +10,7 @@
 	"wp_command_cooldown": "{lightred}Não pode atualizar as skins de armas de momento",
 	"wp_command_refresh_done": "{lime}Atualizando as skins de armas",
 	"wp_live_refresh": "{lime}Loadout atualizado pelo site",
+	"wp_live_refresh_next": "{lime}Loadout atualizado pelo site{default}: aplica-se no teu próximo spawn",
 	"wp_knife_menu_select": "Escolheu {lime}{0}{default} como a sua faca",
 	"wp_knife_menu_kill": "",
 	"wp_knife_menu_title": "Menu de Facas",

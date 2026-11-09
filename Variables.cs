@@ -87,6 +87,9 @@ public partial class WeaponPaints
 	// loadout) and the loadout rev last fetched for each.
 	internal static readonly ConcurrentDictionary<string, PlayerInfo> LivePlayers = new();
 	internal static readonly ConcurrentDictionary<string, long> LoadoutRevs = new();
+	// Slots whose loadout changed while they were alive in a live round (ApplyLoadout):
+	// their weapons are re-given on their next spawn.
+	internal static readonly ConcurrentDictionary<int, bool> PendingWeaponRefresh = new();
 	private CancellationTokenSource? _liveCts;
 	private static bool _gBCommandsAllowed = true;
 	private readonly Dictionary<int, string> _playerWeaponImage = new();

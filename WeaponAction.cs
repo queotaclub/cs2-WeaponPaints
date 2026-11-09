@@ -299,6 +299,9 @@ namespace WeaponPaints
 					{
 						if (!WeaponDefindex.TryGetValue(weapon.Value.AttributeManager.Item.ItemDefinitionIndex, out var weaponByDefindex))
 							continue;
+						// Checked before anything is recorded or killed: returning here used to
+						// leave the weapons already killed un-given.
+						if (gun.VData == null) continue;
 
 						int clip1 = weapon.Value.Clip1;
 						int reservedAmmo = weapon.Value.ReserveAmmo[0];
@@ -311,8 +314,6 @@ namespace WeaponPaints
 
 						value.Add((clip1, reservedAmmo));
 
-						if (gun.VData == null) return;
-						
 						weapon.Value?.AddEntityIOEvent("Kill", weapon.Value, null, "", 0.1f);
 					}
 
@@ -368,10 +369,14 @@ namespace WeaponPaints
 							{
 								if (!newWeapon.IsValid || !player.IsValid) return;
 
-								newWeapon.Clip1 = ammo.Item1;
-								newWeapon.ReserveAmmo[0] = ammo.Item2;
-
+								SetAmmo(newWeapon, ammo.Item1, ammo.Item2);
 								IncrementWearForWeaponWithStickers(player, newWeapon);
+
+								// Equipping can still reset it after this frame: once more when settled.
+								AddTimer(0.1f, () =>
+								{
+									if (newWeapon.IsValid) SetAmmo(newWeapon, ammo.Item1, ammo.Item2);
+								}, TimerFlags.STOP_ON_MAPCHANGE);
 							}
 							catch (Exception ex)
 							{
@@ -381,6 +386,16 @@ namespace WeaponPaints
 							}
 						}
 					}, TimerFlags.STOP_ON_MAPCHANGE);
+		}
+
+		// The ammo the weapon had before it was re-given, marked changed so clients get it
+		// instead of the full magazine the new weapon was created with.
+		private static void SetAmmo(CBasePlayerWeapon weapon, int clip, int reserve)
+		{
+			weapon.Clip1 = clip;
+			Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_iClip1");
+			weapon.ReserveAmmo[0] = reserve;
+			Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_pReserveAmmo");
 		}
 
 		private void GivePlayerGloves(CCSPlayerController player)

@@ -20,7 +20,7 @@ public partial class WeaponPaints : BasePlugin, IPluginConfig<WeaponPaintsConfig
 	public override string ModuleAuthor => "Nereziel & daffyy";
 	public override string ModuleDescription => "Skin, gloves, agents and knife selector, standalone and web-based";
 	public override string ModuleName => "WeaponPaints";
-	public override string ModuleVersion => "3.5-queota";
+	public override string ModuleVersion => "3.6-fightback";
 
 	public override void Load(bool hotReload)
 	{

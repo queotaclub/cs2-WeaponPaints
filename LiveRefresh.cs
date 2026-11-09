@@ -57,16 +57,41 @@ public partial class WeaponPaints
 		if (player is not { IsValid: true, IsBot: false } || player.SteamID.ToString() != info.SteamId)
 			return;
 
+		// Mid-round nothing is re-given: the weapons would vanish and come back (with a
+		// full magazine when the ammo restore misses, so editing the loadout was a free
+		// reload), and the glove refresh switches weapons. A player alive in a live round
+		// gets the change on their next spawn (the next round in a match, the respawn in
+		// DM); OnPlayerSpawn already re-applies gloves, agent, music kit and pin.
+		if (player.PawnIsAlive && RoundIsLive())
+		{
+			PendingWeaponRefresh[player.Slot] = true;
+			if (announce) Announce(player, "wp_live_refresh_next");
+			return;
+		}
+
 		GivePlayerGloves(player);
 		RefreshWeapons(player);
 		GivePlayerAgent(player);
 		GivePlayerMusicKit(player);
 		AddTimer(0.15f, () => GivePlayerPin(player));
 
-		if (!announce) return;
-		var message = Localizer["wp_live_refresh"];
+		if (announce) Announce(player, "wp_live_refresh");
+	}
+
+	private void Announce(CCSPlayerController player, string key)
+	{
+		var message = Localizer[key];
 		if (!message.ResourceNotFound && !string.IsNullOrEmpty(message.Value))
 			player.Print(message.Value);
+	}
+
+	/// <summary>A round is being played: not warmup, not freeze time. Without a game rules
+	/// entity it counts as not live (loadouts apply at once, as before).</summary>
+	internal static bool RoundIsLive()
+	{
+		var rules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
+			.FirstOrDefault()?.GameRules;
+		return rules is { WarmupPeriod: false, FreezePeriod: false };
 	}
 
 	private void StartLiveRefresh()

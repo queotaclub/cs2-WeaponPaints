@@ -119,6 +119,7 @@ namespace WeaponPaints
 			
 			_temporaryPlayerWeaponWear.TryRemove(player.Slot, out _);
 			CommandsCooldown.Remove(player.Slot);
+			PendingWeaponRefresh.TryRemove(player.Slot, out _);
 			UntrackPlayer(playerInfo.SteamId);
 			Players.Remove(player);
 
@@ -135,7 +136,22 @@ namespace WeaponPaints
 		{
 			CCSPlayerController? player = @event.Userid;
 
-			if (player is null || !player.IsValid || Config.Additional is { KnifeEnabled: false, GloveEnabled: false })
+			if (player is null || !player.IsValid)
+				return HookResult.Continue;
+
+			// A loadout change that waited for this spawn (ApplyLoadout): re-give the weapons
+			// carried into the round, during freeze time. Weapons created now (DM respawns,
+			// new buys) already get the new finishes.
+			if (PendingWeaponRefresh.TryRemove(player.Slot, out _))
+			{
+				AddTimer(0.3f, () =>
+				{
+					if (player.IsValid && player.PawnIsAlive && !RoundIsLive())
+						RefreshWeapons(player);
+				}, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+			}
+
+			if (Config.Additional is { KnifeEnabled: false, GloveEnabled: false })
 				return HookResult.Continue;
 
 			CCSPlayerPawn? pawn = player.PlayerPawn.Value;

@@ -1,5 +1,5 @@
 {
-	"wp_prefix": "{lightblue}[WeaponPaints] {default}",
+	"wp_prefix": "[{red}FIGHTBACK.gg{default}] ",
 	"wp_info_website": "Navštiv {lime}{0}{default} kde si můžeš změnit skiny",
 	"wp_info_refresh": "Napiš {lime}!wp{default} pro synchronizaci vybraných skinů",
 	"wp_info_knife": "Napiš {lime}!knife{default} pro otevření menu nožů",
