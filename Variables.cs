@@ -109,32 +109,6 @@ public partial class WeaponPaints
 
 	private static readonly MemoryFunctionVoid<nint, string, float> CAttributeListSetOrAddAttributeValueByName = new(GameData.GetSignature("CAttributeList_SetOrAddAttributeValueByName"));
 
-	// CEconItemView::Update: makes the engine re-publish an econ item after its fields/attributes
-	// were changed, so a new glove renders for everyone right away instead of only after the
-	// player switches weapons. Optional: resolved on first use, and when the signature is missing
-	// or outdated GivePlayerGloves falls back to the old "lastinv" refresh instead of failing
-	// to load the whole plugin.
-	private static MemoryFunctionWithReturn<nint, nint, nint>? _updateItemView;
-	private static bool _updateItemViewResolved;
-
-	private static MemoryFunctionWithReturn<nint, nint, nint>? UpdateItemView
-	{
-		get
-		{
-			if (_updateItemViewResolved)
-				return _updateItemView;
-			_updateItemViewResolved = true;
-			try
-			{
-				_updateItemView = new(GameData.GetSignature("UpdateItemView"));
-			}
-			catch (Exception)
-			{
-				_updateItemView = null;
-			}
-			return _updateItemView;
-		}
-	}
 
 	private static Dictionary<int, string> WeaponDefindex { get; } = new()
 	{
